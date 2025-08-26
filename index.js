@@ -13,7 +13,7 @@ if (!GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Modelo más nuevo y económico
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // Modelo más económico
 
 // Prompt del sistema para Gemini (optimizado)
 const SYSTEM_PROMPT = `Eres un asistente amigable y natural que ayuda con información sobre pagos y productos digitales. Responde en español de forma conversacional, amable y BREVE.
@@ -39,7 +39,7 @@ N.º de cuenta: 0013645218
 
 🧾 Cédula: 1850210004
 
-� Precios de robux:
+💎 Precios de robux:
 🟢 80 robux: $1,50  
 🟢 450 robux: $6,00
 🟢 500 robux: $6,00  
@@ -57,16 +57,44 @@ N.º de cuenta: 0013645218
 
 // Iniciar cliente de WhatsApp
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ]
+    }
 });
 
+// Eventos del cliente
 client.on('qr', (qr) => {
+    addBotLog('📱 Código QR generado. Escanea desde WhatsApp.');
     console.log('Escanea este QR con tu WhatsApp:');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
+    botState.isReady = true;
+    botState.lastActivity = new Date().toISOString();
+    addBotLog('✅ Bot conectado y listo para usar!');
     console.log('✅ Bot conectado a WhatsApp!');
+});
+
+client.on('authenticated', () => {
+    addBotLog('🔐 Autenticación exitosa');
+    console.log('🔐 Autenticación exitosa');
+});
+
+client.on('disconnected', (reason) => {
+    botState.isReady = false;
+    addBotLog(`❌ Bot desconectado: ${reason}`);
+    console.log(`❌ Bot desconectado: ${reason}`);
 });
 
 // Sistema de debounce para esperar múltiples mensajes
@@ -87,6 +115,7 @@ async function processUserMessages(chat, userId) {
         
         if (userMessages.length === 0) return;
         
+        addBotLog(`📥 Procesando ${userMessages.length} mensajes del usuario`);
         console.log(`📥 Procesando ${userMessages.length} mensajes del usuario:`);
         userMessages.forEach((m, i) => {
             console.log(`${i + 1}. "${m.body}"`);
@@ -103,14 +132,18 @@ async function processUserMessages(chat, userId) {
             .slice(0, 3); // Solo 3 mensajes anteriores del usuario
         
         // Obtener respuesta de Gemini
+        addBotLog(`🤖 Consultando Gemini para usuario: ${userId.substring(0, 15)}...`);
         console.log('🤖 Consultando Gemini con contexto completo...');
         const geminiResponse = await getGeminiResponse(combinedMessage, contextHistory);
         
         if (geminiResponse && geminiResponse.trim() !== '') {
+            addBotLog(`✅ Respuesta enviada: ${geminiResponse.substring(0, 30)}...`);
             console.log(`✅ Respuesta de Gemini: ${geminiResponse}`);
             // Enviar mensaje normal sin citar/responder al mensaje original
             await chat.sendMessage(geminiResponse);
+            botState.lastActivity = new Date().toISOString();
         } else {
+            addBotLog('🔇 Gemini no generó respuesta (fuera del tema)');
             console.log('🔇 Gemini no generó respuesta (probablemente fuera del tema)');
         }
         
@@ -123,6 +156,7 @@ async function processUserMessages(chat, userId) {
         });
         
     } catch (error) {
+        addBotLog(`❌ Error procesando mensajes: ${error.message}`);
         console.error('❌ Error procesando mensajes:', error);
     }
 }
@@ -147,6 +181,7 @@ async function getGeminiResponse(userMessage, previousUserMessages = []) {
         const response = await result.response;
         return response.text();
     } catch (error) {
+        addBotLog(`❌ Error Gemini: ${error.message}`);
         console.error('❌ Error al consultar Gemini:', error);
         return null;
     }
@@ -162,6 +197,7 @@ client.on('message', async msg => {
     // Solo procesar mensajes de chats individuales (no grupos ni canales)
     if (!chat.isGroup) {
         console.log('✅ Mensaje de chat individual - procesando...');
+        addBotLog(`📩 Mensaje individual recibido: ${msg.body.substring(0, 30)}...`);
     } else {
         console.log('❌ Mensaje de grupo/canal - ignorando...');
         return; // Salir sin procesar el mensaje
@@ -178,6 +214,7 @@ client.on('message', async msg => {
     // Crear nuevo timer para esperar más mensajes
     const timer = setTimeout(async () => {
         console.log('⌛ Tiempo de espera terminado - procesando mensajes...');
+        addBotLog('⌛ Tiempo de espera terminado - procesando...');
         userTimers.delete(userId);
         await processUserMessages(chat, userId);
     }, WAIT_TIME);
@@ -186,23 +223,13 @@ client.on('message', async msg => {
     console.log(`⏳ Esperando ${WAIT_TIME/1000} segundos por más mensajes...`);
 });
 
+// Inicializar cliente
 client.initialize();
 
-// --- Servidor para el webhook ---
-const app = express();
-app.use(bodyParser.json());
-
-function sendToWebhook(from, body) {
-    // Aquí podrías mandar con fetch o axios
-    console.log(`📤 Enviando al webhook: ${from} -> ${body}`);
-}
-
-app.post('/webhook', (req, res) => {
-    const { number, message } = req.body;
-    client.sendMessage(number, message);
-    res.send({ status: 'ok' });
-});
-
-app.listen(3000, () => {
-    console.log('🌐 Servidor webhook corriendo en http://localhost:3000');
+// Iniciar servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    addBotLog(`🌐 Servidor iniciado en puerto ${PORT}`);
+    console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📊 Dashboard disponible en: http://localhost:${PORT}`);
 });
