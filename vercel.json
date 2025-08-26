@@ -1,0 +1,42 @@
+{
+  "version": 2,
+  "functions": {
+    "api/webhook.js": {
+      "maxDuration": 30
+    },
+    "api/whatsapp.js": {
+      "maxDuration": 30
+    },
+    "api/index.js": {
+      "maxDuration": 10
+    },
+    "api/status.js": {
+      "maxDuration": 10
+    },
+    "api/qr.js": {
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/webhook",
+      "dest": "/api/webhook"
+    },
+    {
+      "src": "/whatsapp",
+      "dest": "/api/whatsapp"
+    },
+    {
+      "src": "/api/status",
+      "dest": "/api/status"
+    },
+    {
+      "src": "/api/qr",
+      "dest": "/api/qr"
+    },
+    {
+      "src": "/",
+      "dest": "/api/index"
+    }
+  ]
+}
