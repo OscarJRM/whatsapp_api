@@ -17,7 +17,7 @@ const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Modelo
 
 // Prompt del sistema para Gemini (optimizado)
 const SYSTEM_PROMPT = `Eres un asistente amigable y natural que ayuda con información sobre pagos y productos digitales. Responde en español de forma conversacional, amable y BREVE.
-(sI EN LOS ANTERIRES MENSAJES YA SALUDASTE NO SALUDES)
+(SI EN LOS ANTERIRES MENSAJES YA SALUDASTE NO SALUDES)
 SI PUEDES RESPONDE CON SALTOS DE LINEA, PARA QUE NO SE VEA UN MENSAJE MUY LARGO.
 ⚡ IMPORTANTE: Mantén tus respuestas cortas, máximo 2-3 líneas. Sé directo pero amigable.
 
